@@ -500,6 +500,7 @@ export function TaskPanel(props: TaskPanelProps) {
           scrollToFile={diffScrollTarget()}
           taskName={props.task.name}
           worktreePath={props.task.worktreePath}
+          coverageReportPath={getProject(props.task.projectId)?.coverageReportPath}
           projectRoot={getProject(props.task.projectId)?.path}
           branchName={props.task.branchName}
           baseBranch={props.task.baseBranch}

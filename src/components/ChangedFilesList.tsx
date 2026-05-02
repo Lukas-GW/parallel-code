@@ -17,6 +17,8 @@ interface ChangedFilesListProps {
   isActive?: boolean;
   panelFocused?: boolean;
   onFileClick?: (file: ChangedFile) => void;
+  /** Optional path to visually mark as the active/open diff target. */
+  activeFilePath?: string | null;
   ref?: (el: HTMLDivElement) => void;
   /** Optional coverage artifact path relative to the repo root. */
   coverageReportPath?: string;
@@ -446,7 +448,12 @@ export function ChangedFilesList(props: ChangedFilesListProps) {
                   (row().isDir || row().node.file?.committed)
                     ? '0.45'
                     : '1',
-                background: selectedIndex() === i ? theme.bgHover : 'transparent',
+                background:
+                  selectedIndex() === i
+                    ? theme.bgHover
+                    : row().node.file && row().node.path === props.activeFilePath
+                      ? 'rgba(88, 166, 255, 0.16)'
+                      : 'transparent',
               }}
               onClick={() => {
                 setSelectedIndex(i);

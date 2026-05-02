@@ -16,6 +16,7 @@ import {
 } from './CommitNavBar';
 import { ReviewCommentsButton, ReviewSidebarPanel } from './ReviewSidebarPanel';
 import { ReviewProvider, useReview } from './ReviewProvider';
+import { ChangedFilesList } from './ChangedFilesList';
 import type { FileDiff } from '../lib/unified-diff-parser';
 import type { ReviewAnnotation } from './review-types';
 import type { CommitInfo } from '../ipc/types';
@@ -28,6 +29,8 @@ interface DiffViewerDialogProps {
   taskName?: string;
   worktreePath: string;
   onClose: () => void;
+  /** Optional coverage artifact path relative to the repo root. */
+  coverageReportPath?: string;
   /** Project root for branch-based fallback when worktree doesn't exist */
   projectRoot?: string;
   /** Branch name for branch-based fallback when worktree doesn't exist */
@@ -94,6 +97,7 @@ export function DiffViewerDialog(props: DiffViewerDialogProps) {
             taskName={props.taskName}
             worktreePath={props.worktreePath}
             onClose={props.onClose}
+            coverageReportPath={props.coverageReportPath}
             projectRoot={props.projectRoot}
             branchName={props.branchName}
             baseBranch={props.baseBranch}
@@ -118,6 +122,7 @@ function DiffViewerContent(props: DiffViewerDialogProps) {
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal('');
   const [searchQuery, setSearchQuery] = createSignal('');
+  const [activeFilePath, setActiveFilePath] = createSignal<string | null>(null);
 
   let fetchGeneration = 0;
   let searchInputRef: HTMLInputElement | undefined;
@@ -140,6 +145,10 @@ function DiffViewerContent(props: DiffViewerDialogProps) {
     };
     document.addEventListener('keydown', handler);
     onCleanup(() => document.removeEventListener('keydown', handler));
+  });
+
+  createEffect(() => {
+    setActiveFilePath(props.scrollToFile);
   });
 
   createEffect(() => {
@@ -385,6 +394,51 @@ function DiffViewerContent(props: DiffViewerDialogProps) {
 
       {/* Body */}
       <div style={{ flex: '1', overflow: 'hidden', display: 'flex' }}>
+        <aside
+          style={{
+            width: '300px',
+            'min-width': '240px',
+            'max-width': '34vw',
+            display: 'flex',
+            'flex-direction': 'column',
+            background: theme.taskPanelBg,
+            'border-right': `1px solid ${theme.border}`,
+            'flex-shrink': '0',
+          }}
+        >
+          <div
+            style={{
+              padding: '8px 10px',
+              'font-size': sf(11),
+              'font-weight': '600',
+              color: theme.fgMuted,
+              'text-transform': 'uppercase',
+              'letter-spacing': '0.05em',
+              'border-bottom': `1px solid ${theme.border}`,
+              'flex-shrink': '0',
+              display: 'flex',
+              'align-items': 'center',
+              gap: '6px',
+            }}
+          >
+            Changed Files
+          </div>
+          <div style={{ flex: '1', overflow: 'hidden' }}>
+            <ChangedFilesList
+              worktreePath={props.worktreePath}
+              baseBranch={props.baseBranch}
+              isActive={props.scrollToFile !== null}
+              panelFocused={false}
+              coverageReportPath={props.coverageReportPath}
+              projectRoot={props.projectRoot}
+              branchName={props.branchName}
+              selectedCommit={props.selectedCommit}
+              activeFilePath={activeFilePath()}
+              onFileClick={(file) => setActiveFilePath(file.path)}
+            />
+          </div>
+        </aside>
+
         <div style={{ flex: '1', overflow: 'hidden' }}>
           <Show when={loading()}>
             <div
@@ -415,7 +469,7 @@ function DiffViewerContent(props: DiffViewerDialogProps) {
           <Show when={!loading() && !error()}>
             <ScrollingDiffView
               files={parsedFiles()}
-              scrollToPath={props.scrollToFile}
+              scrollToPath={activeFilePath()}
               worktreePath={props.worktreePath}
               baseBranch={props.baseBranch}
               searchQuery={searchQuery()}
