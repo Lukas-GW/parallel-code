@@ -280,10 +280,14 @@ export function ChangedFilesList(props: ChangedFilesListProps) {
     }
   }
 
-  // Poll every 5s, matching the git status polling interval.
   // Falls back to branch-based diff when worktree path doesn't exist.
   // When selectedCommit is a hash, fetches files for that single commit (no polling).
   // When selectedCommit is the uncommitted sentinel, fetches all changes and filters.
+  // Always runs an initial fetch on mount/input change so non-active tasks have
+  // populated data — CommitNavBar buttons stopPropagation, so navigating there
+  // wouldn't otherwise activate the task and trigger a fetch. Polling at 5s
+  // (matching git status) is still gated on isActive to avoid running git
+  // pipelines for every off-screen task.
   createEffect(() => {
     const path = props.worktreePath;
     const projectRoot = props.projectRoot;
@@ -292,9 +296,6 @@ export function ChangedFilesList(props: ChangedFilesListProps) {
     const selection = props.selectedCommit;
     const singleCommitHash = isCommitHashSelection(selection) ? selection : null;
     const uncommittedOnly = isUncommittedSelection(selection);
-    // In single-commit mode the user explicitly navigated — always fetch.
-    // In all-changes / uncommitted-only mode skip when inactive to avoid background polling.
-    if (singleCommitHash === null && !props.isActive) return;
     let cancelled = false;
     let inFlight = false;
     let usingBranchFallback = false;
@@ -355,12 +356,14 @@ export function ChangedFilesList(props: ChangedFilesListProps) {
     }
 
     void refresh();
-    // No polling needed for single-commit view (committed data is immutable)
-    const timer = singleCommitHash
-      ? undefined
-      : setInterval(() => {
+    // Polling: skip when inactive (off-screen tasks) and when viewing a single
+    // commit (committed data is immutable).
+    const shouldPoll = singleCommitHash === null && props.isActive;
+    const timer = shouldPoll
+      ? setInterval(() => {
           if (!usingBranchFallback) void refresh();
-        }, 5000);
+        }, 5000)
+      : undefined;
     onCleanup(() => {
       cancelled = true;
       if (timer !== undefined) clearInterval(timer);
