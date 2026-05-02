@@ -498,6 +498,7 @@ export function TaskPanel(props: TaskPanelProps) {
         />
         <DiffViewerDialog
           scrollToFile={diffScrollTarget()}
+          taskName={props.task.name}
           worktreePath={props.task.worktreePath}
           projectRoot={getProject(props.task.projectId)?.path}
           branchName={props.task.branchName}

@@ -24,6 +24,8 @@ import type { GitIsolationMode } from '../store/types';
 interface DiffViewerDialogProps {
   /** Which file to auto-scroll to (the one the user clicked). Null = closed. */
   scrollToFile: string | null;
+  /** Visible task title shown while reviewing changes. */
+  taskName?: string;
   worktreePath: string;
   onClose: () => void;
   /** Project root for branch-based fallback when worktree doesn't exist */
@@ -64,18 +66,21 @@ export function DiffViewerDialog(props: DiffViewerDialogProps) {
     <Dialog
       open={props.scrollToFile !== null}
       onClose={props.onClose}
-      width="90vw"
+      width="100vw"
       labelledBy={titleId}
       panelStyle={{
-        height: '85vh',
-        'max-width': '1400px',
+        height: '100vh',
+        'max-height': 'none',
+        'max-width': 'none',
+        'border-radius': '0',
+        border: 'none',
         overflow: 'hidden',
         padding: '0',
         gap: '0',
       }}
     >
       <h2 id={titleId} class="dialog-sr-only">
-        Diff viewer: {props.scrollToFile ?? 'all changes'}
+        Diff viewer for {props.taskName ?? 'task'}: {props.scrollToFile ?? 'all changes'}
       </h2>
       <Show when={props.scrollToFile !== null}>
         <ReviewProvider
@@ -86,6 +91,7 @@ export function DiffViewerDialog(props: DiffViewerDialogProps) {
         >
           <DiffViewerContent
             scrollToFile={props.scrollToFile}
+            taskName={props.taskName}
             worktreePath={props.worktreePath}
             onClose={props.onClose}
             projectRoot={props.projectRoot}
@@ -246,6 +252,43 @@ function DiffViewerContent(props: DiffViewerDialogProps) {
           'flex-shrink': '0',
         }}
       >
+        <div
+          style={{
+            display: 'flex',
+            'align-items': 'center',
+            gap: '8px',
+            'min-width': '180px',
+            'max-width': '32vw',
+            overflow: 'hidden',
+            'flex-shrink': '1',
+          }}
+          title={props.taskName ?? 'Changes'}
+        >
+          <span
+            style={{
+              'font-size': sf(12),
+              color: theme.fgMuted,
+              'text-transform': 'uppercase',
+              'letter-spacing': '0.06em',
+              'flex-shrink': '0',
+            }}
+          >
+            Changes
+          </span>
+          <span
+            style={{
+              'font-size': sf(14),
+              color: theme.fg,
+              'font-weight': '700',
+              overflow: 'hidden',
+              'text-overflow': 'ellipsis',
+              'white-space': 'nowrap',
+            }}
+          >
+            {props.taskName ?? 'Untitled task'}
+          </span>
+        </div>
+
         <Show when={props.worktreePath && props.gitIsolation === 'worktree'}>
           <CommitNavBar
             commits={props.commitList ?? []}
