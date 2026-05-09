@@ -891,6 +891,23 @@ export function ScrollingDiffView(props: ScrollingDiffViewProps) {
   });
 
   onMount(() => {
+    function onMouseDown(e: MouseEvent) {
+      // For double-clicks (detail >= 2) outside a diff line, prevent the
+      // browser from creating its "snap to nearest text" selection at all,
+      // so the user doesn't see a brief blue flash on the last diff line.
+      // Note: this fires on the second mousedown of the sequence — the
+      // first mousedown of a double-click has detail === 1.
+      if (e.button !== 0 || e.detail < 2) return;
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      )
+        return;
+      if (!target.closest('[data-line-type]')) e.preventDefault();
+    }
+
     function onMouseUp() {
       requestAnimationFrame(() => {
         const sel = getDiffSelection();
@@ -911,8 +928,12 @@ export function ScrollingDiffView(props: ScrollingDiffViewProps) {
       });
     }
 
+    containerRef?.addEventListener('mousedown', onMouseDown);
     containerRef?.addEventListener('mouseup', onMouseUp);
-    onCleanup(() => containerRef?.removeEventListener('mouseup', onMouseUp));
+    onCleanup(() => {
+      containerRef?.removeEventListener('mousedown', onMouseDown);
+      containerRef?.removeEventListener('mouseup', onMouseUp);
+    });
   });
 
   function handleSubmit(text: string, mode: 'review' | 'ask') {
