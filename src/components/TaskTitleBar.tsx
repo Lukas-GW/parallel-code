@@ -6,6 +6,7 @@ import {
   updateTaskName,
   collapseTask,
   getTaskDotStatus,
+  getTaskAttentionState,
   toggleTaskFocusMode,
 } from '../store/store';
 import { EditableText, type EditableTextHandle } from './EditableText';
@@ -81,7 +82,11 @@ export function TaskTitleBar(props: TaskTitleBarProps) {
           gap: '8px',
         }}
       >
-        <StatusDot status={getTaskDotStatus(props.task.id)} size="md" />
+        <StatusDot
+          status={getTaskDotStatus(props.task.id)}
+          size="md"
+          attention={getTaskAttentionState(props.task.id)}
+        />
         <Show when={props.task.gitIsolation === 'direct'}>
           <span style={badgeStyle(theme.warning)}>{props.task.branchName}</span>
         </Show>

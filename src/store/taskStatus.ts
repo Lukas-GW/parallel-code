@@ -144,6 +144,14 @@ function looksLikePrompt(line: string): boolean {
   return PROMPT_PATTERNS.some((re) => re.test(stripped));
 }
 
+function looksLikeBareAgentPrompt(line: string): boolean {
+  return /^\s*[❯›]\s*$/.test(line.trimEnd());
+}
+
+function looksLikeBareShellPrompt(line: string): boolean {
+  return /(?:^|\s)[$%#]\s*$/.test(line.trimEnd());
+}
+
 /**
  * Patterns for known agent main input prompts (ready for a new task).
  * Tested against the stripped data chunk (not a single line), because TUI
@@ -387,7 +395,11 @@ export function looksLikeQuestion(tail: string): boolean {
   // pushing the bare ❯/› line several positions up from the end.
   const lastLine = lines[lines.length - 1].trimEnd();
   const recentLines = lines.slice(-8);
-  if (recentLines.some((l) => /^\s*[❯›]\s*$/.test(l.trimEnd())) || /[❯›]\s*$/.test(lastLine)) {
+  if (
+    recentLines.some(looksLikeBareAgentPrompt) ||
+    /[❯›]\s*$/.test(lastLine) ||
+    looksLikeBareShellPrompt(lastLine)
+  ) {
     return false;
   }
 
@@ -790,23 +802,29 @@ function hasTaskAgentError(taskId: string): boolean {
   });
 }
 
+function hasRunningTaskActivity(taskId: string, predicate: (id: string) => boolean): boolean {
+  const task = store.tasks[taskId];
+  if (!task) return false;
+
+  return (
+    task.agentIds.some((id) => {
+      const agent = store.agents[id];
+      return agent?.status === 'running' && predicate(id);
+    }) || task.shellAgentIds.some((id) => predicate(id))
+  );
+}
+
 export function getTaskAttentionState(taskId: string): TaskAttentionState {
   const task = store.tasks[taskId];
   if (!task) return 'idle';
 
   if (hasTaskAgentError(taskId)) return 'error';
 
-  const active = activeAgents(); // reactive read
-  const hasQuestion = task.agentIds.some((id) => {
-    const agent = store.agents[id];
-    return agent?.status === 'running' && isAgentAskingQuestion(id);
-  });
+  const hasQuestion = hasRunningTaskActivity(taskId, isAgentAskingQuestion);
   if (hasQuestion) return 'needs_input';
 
-  const hasActive = task.agentIds.some((id) => {
-    const agent = store.agents[id];
-    return agent?.status === 'running' && active.has(id);
-  });
+  const active = activeAgents(); // reactive read
+  const hasActive = hasRunningTaskActivity(taskId, (id) => active.has(id));
   if (hasActive) return 'active';
 
   if (isTaskReady(taskId)) return 'ready';
@@ -822,10 +840,7 @@ export function getTaskDotStatus(taskId: string): TaskDotStatus {
   const task = store.tasks[taskId];
   if (!task) return 'waiting';
   const active = activeAgents(); // reactive read
-  const hasActive = task.agentIds.some((id) => {
-    const a = store.agents[id];
-    return a?.status === 'running' && active.has(id);
-  });
+  const hasActive = hasRunningTaskActivity(taskId, (id) => active.has(id));
   if (hasActive) return 'busy';
 
   const steps = task.stepsContent;
@@ -977,10 +992,7 @@ export async function refreshAllTaskGitStatus(): Promise<void> {
       if (taskId === currentTaskId) return false;
       const task = store.tasks[taskId];
       if (!task) return false;
-      return !task.agentIds.some((id) => {
-        const a = store.agents[id];
-        return a?.status === 'running' && active.has(id);
-      });
+      return !hasRunningTaskActivity(taskId, (id) => active.has(id));
     });
 
     // Process in batches of 4 to limit concurrent git processes

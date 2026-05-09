@@ -217,6 +217,10 @@ describe('looksLikeQuestion', () => {
     expect(looksLikeQuestion(tail)).toBe(false);
   });
 
+  it('returns false when a shell prompt appears after earlier question text', () => {
+    expect(looksLikeQuestion('Continue? [Y/n]\n$ ')).toBe(false);
+  });
+
   it('returns false when prompt marker has a deep multi-line footer below it (Codex CLI layout)', () => {
     // Codex CLI renders a multi-line help bar (separator + shortcuts + separator)
     // below the › prompt, pushing it 4+ lines from the end.
@@ -670,6 +674,16 @@ describe('task attention state', () => {
     expect(taskNeedsAttention('task-1')).toBe(true);
   });
 
+  it('returns active and busy when a task shell is currently producing output', () => {
+    setMockTask('task-1', { agentIds: [], shellAgentIds: ['shell-1'] });
+
+    markAgentSpawned('shell-1');
+
+    expect(getTaskAttentionState('task-1')).toBe('active');
+    expect(getTaskDotStatus('task-1')).toBe('busy');
+    expect(taskNeedsAttention('task-1')).toBe(true);
+  });
+
   it('returns error when a task agent exits non-zero', () => {
     setMockTask('task-1', { agentIds: ['agent-1'] });
     setMockAgent('agent-1', { status: 'exited', exitCode: 1, signal: null });
@@ -689,6 +703,30 @@ describe('task attention state', () => {
     expect(isAgentAskingQuestion('agent-2')).toBe(true);
     expect(getTaskAttentionState('task-2')).toBe('needs_input');
     expect(taskNeedsAttention('task-2')).toBe(true);
+  });
+
+  it('detects question state for task shell terminals', () => {
+    setMockTask('task-1', { agentIds: [], shellAgentIds: ['shell-1'] });
+
+    const question = new TextEncoder().encode('Continue? [Y/n]');
+    markAgentOutput('shell-1', question, 'task-1');
+
+    expect(isAgentAskingQuestion('shell-1')).toBe(true);
+    expect(getTaskAttentionState('task-1')).toBe('needs_input');
+    expect(taskNeedsAttention('task-1')).toBe(true);
+  });
+
+  it('clears task shell question state when the shell prompt returns', () => {
+    setMockTask('task-1', { agentIds: [], shellAgentIds: ['shell-1'] });
+
+    markAgentOutput('shell-1', new TextEncoder().encode('Continue? [Y/n]'), 'task-1');
+    expect(getTaskAttentionState('task-1')).toBe('needs_input');
+
+    markAgentOutput('shell-1', new TextEncoder().encode('\n$ '), 'task-1');
+
+    expect(isAgentAskingQuestion('shell-1')).toBe(false);
+    expect(getTaskAttentionState('task-1')).toBe('idle');
+    expect(taskNeedsAttention('task-1')).toBe(false);
   });
 
   it('preserves question state for throttled background prompt transitions', () => {

@@ -7,6 +7,8 @@ import {
   runBookmarkInTask,
   closeShell,
   markAgentOutput,
+  clearAgentActivity,
+  refreshTaskStatus,
   registerFocusFn,
   unregisterFocusFn,
   setActiveTask,
@@ -282,12 +284,14 @@ export function TaskShellSection(props: TaskShellSectionProps) {
                     dockerImage={props.task.dockerImage}
                     initialCommand={initialCommand}
                     onData={(data) => markAgentOutput(shellId, data, props.task.id)}
-                    onExit={(info) =>
+                    onExit={(info) => {
+                      clearAgentActivity(shellId);
+                      refreshTaskStatus(props.task.id);
                       setShellExits(shellId, {
                         exitCode: info.exit_code,
                         signal: info.signal,
-                      })
-                    }
+                      });
+                    }}
                     onReady={(focusFn) => {
                       shellFocusFn = focusFn;
                       if (registeredKey) registerFocusFn(registeredKey, focusFn);

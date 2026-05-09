@@ -138,6 +138,7 @@ export {
   isTrustQuestionAutoHandled,
   isAutoTrustSettling,
   isAgentAskingQuestion,
+  refreshTaskStatus,
   startTaskStatusPolling,
   stopTaskStatusPolling,
   rescheduleTaskStatusPolling,
