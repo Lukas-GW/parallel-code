@@ -40,6 +40,7 @@ interface AgentTrackingState {
   lastAnalysisAt?: number;
   pendingAnalysis?: ReturnType<typeof setTimeout>;
   pendingAnalysisDueAt?: number;
+  bracketedPasteEnabled?: boolean;
 }
 
 const agentStates = new Map<string, AgentTrackingState>();
@@ -51,6 +52,18 @@ function getAgentState(agentId: string): AgentTrackingState {
     agentStates.set(agentId, state);
   }
   return state;
+}
+
+function updateBracketedPasteMode(state: AgentTrackingState, text: string): void {
+  // Bracketed paste mode is controlled by CSI ? 2004 h/l.  Track the last
+  // mode switch seen in the new PTY data so synthetic prompt sends can match
+  // terminal paste semantics instead of arriving as rapid raw keystrokes.
+  // eslint-disable-next-line no-control-regex
+  const re = /\x1b\[\?2004([hl])/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    state.bracketedPasteEnabled = m[1] === 'h';
+  }
 }
 
 const POST_AUTO_TRUST_SETTLE_MS = 1_000;
@@ -431,6 +444,11 @@ export function isAgentAskingQuestion(agentId: string): boolean {
   return questionAgents().has(agentId);
 }
 
+/** True when the agent's terminal has requested bracketed paste mode. */
+export function isAgentBracketedPasteEnabled(agentId: string): boolean {
+  return agentStates.get(agentId)?.bracketedPasteEnabled === true;
+}
+
 function updateQuestionState(agentId: string, hasQuestion: boolean): void {
   setQuestionAgents((prev) => {
     if (hasQuestion === prev.has(agentId)) return prev;
@@ -540,6 +558,7 @@ function scheduleAgentAnalysis(agentId: string, intervalMs: number, now: number)
 export function markAgentSpawned(agentId: string): void {
   const state = getAgentState(agentId);
   state.outputTailBuffer = '';
+  state.bracketedPasteEnabled = false;
   clearAutoTrustState(agentId);
   state.lastAnalysisAt = undefined;
   cancelPendingAnalysis(state);
@@ -632,6 +651,7 @@ export function markAgentOutput(agentId: string, data: Uint8Array, taskId?: stri
   state.lastDataAt = now;
 
   const text = state.decoder.decode(data, { stream: true });
+  updateBracketedPasteMode(state, state.outputTailBuffer.slice(-16) + text);
   const combined = state.outputTailBuffer + text;
   state.outputTailBuffer =
     combined.length > TAIL_BUFFER_MAX

@@ -11,6 +11,7 @@ import {
   markAgentBusy,
   clearAgentActivity,
   clearTaskGitStatusTracking,
+  isAgentBracketedPasteEnabled,
   isAgentIdle,
   rescheduleTaskStatusPolling,
 } from './taskStatus';
@@ -52,6 +53,8 @@ function initTaskInStore(
 
 const AGENT_WRITE_READY_TIMEOUT_MS = 8_000;
 const AGENT_WRITE_RETRY_MS = 50;
+const BRACKETED_PASTE_START = '\x1b[200~';
+const BRACKETED_PASTE_END = '\x1b[201~';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -477,9 +480,16 @@ export async function sendPrompt(taskId: string, agentId: string, text: string):
   // to the PTY, which may suspend readline input processing; \x1b[I re-activates it.
   await writeToAgentWhenReady(agentId, '\x1b[I');
   // Send text and Enter separately so TUI apps (Claude Code, Codex)
-  // don't treat the \r as part of a pasted block
+  // don't treat the \r as part of a pasted block.  When the agent has enabled
+  // bracketed paste, wrap only the prompt text; this avoids Codex's paste-burst
+  // guard treating rapid synthetic keystrokes plus Enter as a paste.
   setTaskLastInputAt(taskId);
-  await writeToAgentWhenReady(agentId, effectiveText);
+  await writeToAgentWhenReady(
+    agentId,
+    isAgentBracketedPasteEnabled(agentId)
+      ? `${BRACKETED_PASTE_START}${effectiveText}${BRACKETED_PASTE_END}`
+      : effectiveText,
+  );
   await new Promise((r) => setTimeout(r, 50));
   await writeToAgentWhenReady(agentId, '\r');
   setStore('tasks', taskId, 'lastPrompt', text);

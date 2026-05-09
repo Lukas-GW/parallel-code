@@ -55,6 +55,7 @@ import {
   isTrustQuestionAutoHandled,
   isAutoTrustSettling,
   isAgentAskingQuestion,
+  isAgentBracketedPasteEnabled,
   getTaskAttentionState,
   getTaskDotStatus,
   taskNeedsAttention,
@@ -519,6 +520,56 @@ describe('isAutoTrustSettling', () => {
     vi.advanceTimersByTime(2100);
 
     expect(isAutoTrustSettling('agent-1')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// bracketed paste mode
+// ---------------------------------------------------------------------------
+describe('isAgentBracketedPasteEnabled', () => {
+  it('tracks bracketed paste enable and disable sequences', () => {
+    markAgentSpawned('agent-1');
+    expect(isAgentBracketedPasteEnabled('agent-1')).toBe(false);
+
+    markAgentOutput('agent-1', new TextEncoder().encode('\x1b[?2004h'), 'task-1');
+    expect(isAgentBracketedPasteEnabled('agent-1')).toBe(true);
+
+    markAgentOutput('agent-1', new TextEncoder().encode('\x1b[?2004l'), 'task-1');
+    expect(isAgentBracketedPasteEnabled('agent-1')).toBe(false);
+  });
+
+  it('uses the last bracketed paste sequence in a chunk', () => {
+    markAgentSpawned('agent-1');
+
+    markAgentOutput(
+      'agent-1',
+      new TextEncoder().encode('\x1b[?2004h redraw \x1b[?2004l exit'),
+      'task-1',
+    );
+
+    expect(isAgentBracketedPasteEnabled('agent-1')).toBe(false);
+  });
+
+  it('tracks bracketed paste sequences split across PTY chunks', () => {
+    markAgentSpawned('agent-1');
+
+    markAgentOutput('agent-1', new TextEncoder().encode('\x1b[?20'), 'task-1');
+    expect(isAgentBracketedPasteEnabled('agent-1')).toBe(false);
+
+    markAgentOutput('agent-1', new TextEncoder().encode('04h'), 'task-1');
+    expect(isAgentBracketedPasteEnabled('agent-1')).toBe(true);
+  });
+
+  it('detects bracketed paste sequence before retained tail in a large chunk', () => {
+    markAgentSpawned('agent-1');
+
+    markAgentOutput(
+      'agent-1',
+      new TextEncoder().encode('\x1b[?2004h' + 'x'.repeat(20_000)),
+      'task-1',
+    );
+
+    expect(isAgentBracketedPasteEnabled('agent-1')).toBe(true);
   });
 });
 
