@@ -693,7 +693,7 @@ describe('task attention state', () => {
 
     markAgentSpawned('agent-1');
 
-    expect(getTaskAttentionState('task-1')).toBe('active');
+    expect(getTaskAttentionState('task-1')).toBe('review');
     expect(getTaskDotStatus('task-1')).toBe('review');
   });
 

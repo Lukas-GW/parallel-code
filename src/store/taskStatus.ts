@@ -854,7 +854,11 @@ export function getTaskAttentionState(taskId: string): TaskAttentionState {
   const hasQuestion = hasRunningTaskActivity(taskId, isAgentAskingQuestion);
   if (hasQuestion) return 'needs_input';
 
-  if (task.needsReview) return 'review';
+  const steps = task.stepsContent;
+  if (steps && steps.length > 0) {
+    const latest = steps[steps.length - 1];
+    if (latest.status === 'awaiting_review') return 'review';
+  }
 
   const active = activeAgents(); // reactive read
   const hasActive = hasRunningTaskActivity(taskId, (id) => active.has(id));
