@@ -35,6 +35,9 @@
     "prepare": "husky && git config core.hooksPath .husky"
   },
   "license": "MIT",
+  "overrides": {
+    "dompurify": "^3.4.5"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@xterm/addon-fit": "^0.12.0-beta.195",
